@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Diseases{% endblock %}
+{% block content %}
+<h1>Diseases in the system</h1>
+<div class="grid2">
+  {% for name, d in diseases.items() %}
+  <div class="card">
+    <h2>{{ name }}</h2>
+    <p>{{ d.description }}</p>
+    <p>{% for s in d.core %}<span class="tag">{{ label(s) }}</span>{% endfor %}</p>
+    <p class="muted">See: {{ d.specialist }}</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

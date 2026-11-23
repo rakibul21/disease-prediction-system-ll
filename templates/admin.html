@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+{% block content %}
+<h1>Admin dashboard</h1>
+<div class="stats">
+  <div class="stat"><b>{{ users|length }}</b>Users</div>
+  <div class="stat"><b>{{ total_pred }}</b>Predictions</div>
+  <div class="stat"><b>{{ "%.1f"|format(accuracy) }}%</b>Model accuracy (sample data)</div>
+</div>
+
+<div class="card">
+  <h2>Most predicted diseases</h2>
+  {% for name, c in ranked %}
+  <div class="row">
+    <div class="name">{{ name }}</div>
+    <div class="bar"><i style="width: {{ (c / biggest * 100)|round }}%"></i></div>
+    <div class="pct">{{ c }}</div>
+  </div>
+  {% else %}<p class="muted">No predictions yet.</p>{% endfor %}
+</div>
+
+<div class="card">
+  <h2>Registered users</h2>
+  <table>
+    <tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Predictions</th><th>Joined</th></tr>
+    {% for u in users %}
+    <tr><td>{{ u.id }}</td><td>{{ u.name }}</td><td>{{ u.email }}</td>
+        <td>{{ 'Admin' if u.is_admin else 'User' }}</td><td>{{ u.n }}</td><td>{{ u.created_at }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

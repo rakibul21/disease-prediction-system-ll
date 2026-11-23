@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}History{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>My prediction history</h1>
+  {% if items %}
+  <table>
+    <tr><th>Date</th><th>Symptoms</th><th>Top result</th><th></th></tr>
+    {% for it in items %}
+    <tr>
+      <td>{{ it.created_at }}</td>
+      <td>{% for s in it.symptoms %}<span class="tag">{{ label(s) }}</span>{% endfor %}</td>
+      <td><b>{{ it.top[0] }}</b> ({{ it.top[1] }}%)</td>
+      <td>
+        <a class="btn small ghost" href="{{ url_for('result', pid=it.id) }}">View</a>
+        <form method="post" action="{{ url_for('delete_history', pid=it.id) }}" style="display:inline" onsubmit="return confirm('Delete this record?')">
+          <button class="btn small danger" type="submit">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+    <p class="muted">No predictions yet. <a href="{{ url_for('predict') }}">Make your first one.</a></p>
+  {% endif %}
+</div>
+{% endblock %}

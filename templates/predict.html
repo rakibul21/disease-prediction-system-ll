@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Predict{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Select your symptoms</h1>
+  <p class="muted">Choose at least 2 symptoms. The more accurate your selection, the better the result.</p>
+  <form method="post">
+    <input type="search" id="q" placeholder="Search symptoms (e.g. fever, cough)...">
+    <div class="symgrid" id="grid">
+      {% for s in symptoms %}
+      <label class="sym" data-name="{{ label(s)|lower }}">
+        <input type="checkbox" name="symptoms" value="{{ s }}"> {{ label(s) }}
+      </label>
+      {% endfor %}
+    </div>
+    <p><span id="count" class="muted">0 selected</span></p>
+    <button class="btn" type="submit">Predict disease</button>
+  </form>
+</div>
+<script>
+  const q = document.getElementById('q'), items = document.querySelectorAll('.sym'), count = document.getElementById('count');
+  q.addEventListener('input', () => {
+    const v = q.value.trim().toLowerCase();
+    items.forEach(i => i.style.display = i.dataset.name.includes(v) ? '' : 'none');
+  });
+  document.getElementById('grid').addEventListener('change', () => {
+    count.textContent = document.querySelectorAll('.sym input:checked').length + ' selected';
+  });
+</script>
+{% endblock %}

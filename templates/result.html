@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Result{% endblock %}
+{% block content %}
+<div class="card">
+  <p class="muted">{{ row.created_at }}</p>
+  <h1>Most likely: {{ top }}</h1>
+  <p>{{ info.description }}</p>
+  <p><b>Your symptoms:</b>
+    {% for s in symptoms %}<span class="tag">{{ label(s) }}</span>{% endfor %}
+  </p>
+</div>
+
+<div class="card">
+  <h2>Top matches</h2>
+  {% for name, pct in results %}
+  <div class="row">
+    <div class="name">{{ name }}</div>
+    <div class="bar"><i style="width: {{ pct }}%"></i></div>
+    <div class="pct">{{ pct }}%</div>
+  </div>
+  {% endfor %}
+  <p class="muted">Match score comes from a Naive Bayes model trained on a sample dataset
+  (hold-out accuracy on that sample: {{ "%.1f"|format(accuracy) }}%).</p>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <h2>Precautions</h2>
+    <ul>{% for p in info.precautions %}<li>{{ p }}</li>{% endfor %}</ul>
+  </div>
+  <div class="card">
+    <h2>Doctor to consult</h2>
+    <p>{{ info.specialist }}</p>
+  </div>
+</div>
+
+<div class="disclaimer">This is an educational prediction and not a medical diagnosis. Please consult a qualified doctor, and seek emergency care for severe symptoms.</div>
+<p class="noprint">
+  <a class="btn" href="{{ url_for('predict') }}">New prediction</a>
+  <a class="btn ghost" href="{{ url_for('history') }}">History</a>
+  <button class="btn ghost" onclick="window.print()">Print / Save PDF</button>
+</p>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card hero">
+  <h1>Disease Prediction Management System</h1>
+  <p class="muted">Select your symptoms and get the most likely conditions, precautions and which doctor to see.</p>
+  <div class="stats">
+    <div class="stat"><b>{{ n_diseases }}</b>Diseases</div>
+    <div class="stat"><b>{{ n_symptoms }}</b>Symptoms</div>
+    <div class="stat"><b>Naive Bayes</b>ML model</div>
+  </div>
+  {% if session.user_id %}
+    <a class="btn" href="{{ url_for('predict') }}">Start a prediction</a>
+  {% else %}
+    <a class="btn" href="{{ url_for('register') }}">Create account</a>
+    <a class="btn ghost" href="{{ url_for('login') }}">Login</a>
+  {% endif %}
+</div>
+<div class="card">
+  <h2>How it works</h2>
+  <ol>
+    <li>Register and log in.</li>
+    <li>Tick the symptoms you have (search to filter).</li>
+    <li>The trained model shows the top 3 likely diseases with a match score.</li>
+    <li>See precautions, the right specialist, and your saved history anytime.</li>
+  </ol>
+</div>
+{% endblock %}
