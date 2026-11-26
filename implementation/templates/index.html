@@ -6,7 +6,6 @@
   <div class="stats">
     <div class="stat"><b>{{ n_diseases }}</b>Diseases</div>
     <div class="stat"><b>{{ n_symptoms }}</b>Symptoms</div>
-    <div class="stat"><b>Naive Bayes</b>ML model</div>
   </div>
   {% if session.user_id %}
     <a class="btn" href="{{ url_for('predict') }}">Start a prediction</a>
