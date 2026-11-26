@@ -8,8 +8,8 @@
 | Member | Student ID | Project role | Main responsibilities |
 | --- | --- | --- | --- |
 | Hasan MD Rakibul | 2677526 | Project lead, analyst and developer | Requirements, design, backend, database, ML model, GitHub, final accountability |
-| Ruman | | Tester and UI reviewer | Testing, bug reports, interface review, RTM, document review, presentation |
-| Islam MD Din | | Analyst and quality reviewer | Use case and sequence diagrams, testing, proofreading, presentation |
+| Hosen Aiyub | 2677530 | Tester and UI reviewer | Testing, bug reports, interface review, RTM, document review, presentation |
+| Islam MD Din | 2677519 | Analyst and quality reviewer | Use case and sequence diagrams, testing, proofreading, presentation |
 | Prof. Musa Ibrahim | | Supervisor | Reviews and approves the deliverables |
 
 The exact duties of each member are set out in the RACI matrix: `../implementation/RACI-matrix.md`.
@@ -18,7 +18,7 @@ The exact duties of each member are set out in the RACI matrix: `../implementati
 
 Hours are planning estimates. The labour value uses 10,320 KRW per hour (2026 legal minimum wage), as in the feasibility study.
 
-| Phase | Hasan MD Rakibul | Ruman | Islam MD Din | Total hours |
+| Phase | Hasan MD Rakibul | Hosen Aiyub | Islam MD Din | Total hours |
 | --- | --- | --- | --- | --- |
 | Planning (system request, feasibility, staffing) | 8 | 2 | 2 | 12 |
 | Analysis (SRS, RTM) | 20 | 6 | 6 | 32 |
@@ -47,7 +47,7 @@ Weeks are counted from the start of the project (the course term has its own cal
 | Skill | Needed by | Source |
 | --- | --- | --- |
 | Python, Flask, SQLite | Hasan MD Rakibul | Already known; official documentation |
-| Basic testing and reading Python code | Ruman, Islam MD Din | Run the test suite and read the SRS and sequence diagram |
+| Basic testing and reading Python code | Hosen Aiyub, Islam MD Din | Run the test suite and read the SRS and sequence diagram |
 | UML (use case, sequence) | Islam MD Din | Course material |
 
 ## 5. Communication and control

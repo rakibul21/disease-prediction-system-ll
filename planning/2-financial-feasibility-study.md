@@ -17,7 +17,7 @@ Feasible. The system uses well-known free tools (Python, Flask, SQLite) that the
 | Item | Detail | Cost (KRW) |
 | --- | --- | --- |
 | Labour: Hasan MD Rakibul | 100 hours x 10,320 | 1,032,000 |
-| Labour: Ruman | 30 hours x 10,320 | 309,600 |
+| Labour: Hosen Aiyub | 30 hours x 10,320 | 309,600 |
 | Labour: Islam MD Din | 30 hours x 10,320 | 309,600 |
 | Software | Python, Flask, SQLite, VS Code, GitHub: free and open source | 0 |
 | Hardware | The team's own laptops, already owned | 0 |

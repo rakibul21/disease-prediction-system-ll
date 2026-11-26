@@ -3,7 +3,7 @@
 **Project:** Disease Prediction Management System
 **Course:** Software Design, Dongshin University
 **Professor:** Musa Ibrahim
-**Prepared by:** Hasan MD Rakibul (2677526), Ruman, Islam MD Din
+**Prepared by:** Hasan MD Rakibul (2677526), Hosen Aiyub (2677530), Islam MD Din (2677519)
 **Date:** 2026-11-26
 
 ## 1. Project sponsor
