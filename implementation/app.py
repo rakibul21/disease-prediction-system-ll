@@ -1,69 +1,82 @@
 import json
+import logging
 import os
-import sqlite3
+import sys
 from datetime import datetime
 from functools import wraps
 
 from flask import (Flask, abort, flash, g, redirect, render_template, request,
                    session, url_for)
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
+import db as database
 import model
-from data import DISEASES, SYMPTOMS, label
+from data import COURSE, DISEASES, PROFESSOR, SYMPTOMS, TEAM, label
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "database.db")
+DB_PATH = database.SQLITE_PATH  # only used when DATABASE_URL is not set (local SQLite)
+
+# ---------- configuration (12-factor: everything comes from environment variables) ----------
+APP_ENV = os.environ.get("APP_ENV", "development")
+SECRET_KEY = os.environ.get("SECRET_KEY", "")
+if not SECRET_KEY:
+    if APP_ENV == "production":
+        raise RuntimeError("SECRET_KEY must be set when APP_ENV=production")
+    SECRET_KEY = "dev-secret-change-me"
+
+# Logs go to stdout so the platform (Docker, Render, Kubernetes) can collect them.
+logging.basicConfig(
+    stream=sys.stdout,
+    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
+app.secret_key = SECRET_KEY
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.environ.get("COOKIE_SECURE", "0") == "1",
+)
+if os.environ.get("TRUST_PROXY", "0") == "1":  # behind a load balancer / reverse proxy
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.jinja_env.globals["label"] = label
+app.jinja_env.globals.update(COURSE=COURSE, PROFESSOR=PROFESSOR, TEAM=TEAM)
 
 
 # ---------- database ----------
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(DB_PATH)
-        g.db.row_factory = sqlite3.Row
+        g.db = database.connect()
     return g.db
 
 
 @app.teardown_appcontext
 def close_db(_):
-    db = g.pop("db", None)
-    if db is not None:
-        db.close()
+    conn = g.pop("db", None)
+    if conn is not None:
+        conn.close()
 
 
 def init_db():
-    db = sqlite3.connect(DB_PATH)
-    db.executescript(
-        """
-        CREATE TABLE IF NOT EXISTS users(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT NOT NULL UNIQUE,
-            password_hash TEXT NOT NULL,
-            is_admin INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS predictions(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            symptoms TEXT NOT NULL,
-            results TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            FOREIGN KEY(user_id) REFERENCES users(id)
-        );
-        """
-    )
-    # Default admin account (change the password after first login!)
-    if not db.execute("SELECT 1 FROM users WHERE is_admin=1").fetchone():
-        db.execute(
-            "INSERT INTO users(name,email,password_hash,is_admin,created_at) VALUES(?,?,?,1,?)",
-            ("Admin", "admin@example.com", generate_password_hash("admin123"), now()),
-        )
-    db.commit()
-    db.close()
+    conn = database.connect()
+    try:
+        database.init_schema(conn)
+        # Default admin account. Set ADMIN_EMAIL / ADMIN_PASSWORD in the cloud.
+        if not conn.execute("SELECT 1 FROM users WHERE is_admin=1").fetchone():
+            conn.execute(
+                "INSERT INTO users(name,email,password_hash,is_admin,created_at) "
+                "VALUES(?,?,?,1,?) ON CONFLICT(email) DO NOTHING",
+                (
+                    "Admin",
+                    os.environ.get("ADMIN_EMAIL", "admin@example.com"),
+                    generate_password_hash(os.environ.get("ADMIN_PASSWORD", "admin123")),
+                    now(),
+                ),
+            )
+            conn.commit()
+    finally:
+        conn.close()
 
 
 def now():
@@ -115,7 +128,8 @@ def register():
                 db.commit()
                 flash("Account created. Please log in.", "ok")
                 return redirect(url_for("login"))
-            except sqlite3.IntegrityError:
+            except database.IntegrityError:
+                db.rollback()
                 flash("That email is already registered.", "error")
     return render_template("register.html")
 
@@ -152,12 +166,12 @@ def predict():
         else:
             results = model.predict(chosen, top_n=3)
             db = get_db()
-            cur = db.execute(
+            pid = db.insert(
                 "INSERT INTO predictions(user_id,symptoms,results,created_at) VALUES(?,?,?,?)",
                 (session["user_id"], json.dumps(chosen), json.dumps(results), now()),
             )
             db.commit()
-            return redirect(url_for("result", pid=cur.lastrowid))
+            return redirect(url_for("result", pid=pid))
     return render_template("predict.html", symptoms=SYMPTOMS)
 
 
@@ -209,6 +223,22 @@ def delete_history(pid):
     return redirect(url_for("history"))
 
 
+@app.route("/health")
+def health():
+    """Liveness/readiness probe for Docker, load balancers and Kubernetes."""
+    try:
+        database.ping()
+    except Exception:  # noqa: BLE001 - any DB failure means "not ready"
+        app.logger.exception("health check failed")
+        return {"status": "unhealthy"}, 503
+    return {"status": "ok", "database": "postgresql" if database.IS_PG else "sqlite"}
+
+
+@app.route("/about")
+def about():
+    return render_template("about.html")
+
+
 @app.route("/diseases")
 def diseases():
     return render_template("diseases.html", diseases=DISEASES)
@@ -223,7 +253,7 @@ def admin():
                   (SELECT COUNT(*) FROM predictions p WHERE p.user_id=u.id) AS n
            FROM users u ORDER BY u.id"""
     ).fetchall()
-    total_pred = db.execute("SELECT COUNT(*) FROM predictions").fetchone()[0]
+    total_pred = db.execute("SELECT COUNT(*) AS n FROM predictions").fetchone()["n"]
     counts = {}
     for r in db.execute("SELECT results FROM predictions"):
         d = json.loads(r["results"])[0][0]
@@ -248,6 +278,7 @@ def not_found(_):
 
 init_db()
 model.get_bundle()  # train on first run so the first prediction is instant
+app.logger.info("Started (env=%s, database=%s)", APP_ENV, "postgresql" if database.IS_PG else "sqlite")
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=os.environ.get("FLASK_DEBUG", "1") == "1")

@@ -36,21 +36,38 @@ def login(c, email="user@test.com", pw="secret1"):
     return c.post("/login", data={"email": email, "password": pw})
 
 
+def raw_con():
+    """Plain DB-API connection to whichever database the app is using."""
+    if A.database.IS_PG:
+        import psycopg2
+        return psycopg2.connect(A.database.DATABASE_URL)
+    return sqlite3.connect(A.DB_PATH)
+
+
 def db_rows(sql, args=()):
-    con = sqlite3.connect(A.DB_PATH)
+    con = raw_con()
     try:
-        return con.execute(sql, args).fetchall()
+        cur = con.cursor()
+        cur.execute(sql, args)
+        return cur.fetchall()
     finally:
         con.close()
 
 
 class Tests(unittest.TestCase):
     def setUp(self):
-        con = sqlite3.connect(A.DB_PATH)
-        con.execute("DELETE FROM predictions")
-        con.execute("DELETE FROM users WHERE is_admin=0")
+        con = raw_con()
+        cur = con.cursor()
+        cur.execute("DELETE FROM predictions")
+        cur.execute("DELETE FROM users WHERE is_admin=0")
         con.commit()
         con.close()
+
+    # ---- cloud readiness ----
+    def test_health_endpoint(self):
+        r = client().get("/health")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.get_json()["status"], "ok")
 
     # ---- accounts ----
     def test_tc01_register_and_duplicate_email(self):

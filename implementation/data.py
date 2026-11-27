@@ -147,3 +147,13 @@ SYMPTOMS = sorted({s for d in DISEASES.values() for s in d["core"] + d["secondar
 def label(symptom: str) -> str:
     """'eye_pain_behind' -> 'Eye Pain Behind'"""
     return symptom.replace("_", " ").title()
+
+
+# ---------- course / team info ----------
+COURSE = "Software Design, Dongshin University"
+PROFESSOR = "Musa Ibrahim"
+TEAM = [
+    {"name": "Hasan MD Rakibul", "id": "2677526"},
+    {"name": "Hosen Aiyub", "id": "2677530"},
+    {"name": "Islam MD Din", "id": "2677519"},
+]

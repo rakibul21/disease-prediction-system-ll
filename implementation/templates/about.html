@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}About - Disease Prediction System{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>About this project</h1>
+  <p>Disease Prediction Management System, built for the <b>{{ COURSE }}</b> course.</p>
+  <p><b>Professor:</b> {{ PROFESSOR }}</p>
+  <h2>Team</h2>
+  <table>
+    <tr><th>#</th><th>Name</th><th>Student ID</th></tr>
+    {% for m in TEAM %}<tr><td>{{ loop.index }}</td><td>{{ m.name }}</td><td>{{ m.id }}</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

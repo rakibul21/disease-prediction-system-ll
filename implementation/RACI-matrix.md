@@ -11,7 +11,7 @@ Project: Disease Prediction Management System, Software Design, Dongshin Univers
 
 `A/R` means the same person does the work and owns the result.
 
-| Activity | Hasan MD Rakibul | Ruman | Islam MD Din | Prof. Musa Ibrahim |
+| Activity | Hasan MD Rakibul | Hosen Aiyub | Islam MD Din | Prof. Musa Ibrahim |
 | --- | --- | --- | --- | --- |
 | Project idea and scope | A/R | C | C | I |
 | Requirements gathering (SRS sections 1 to 4) | A/R | C | C | I |
