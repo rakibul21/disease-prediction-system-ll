@@ -1,8 +1,8 @@
-"""Database layer: PostgreSQL in the cloud, SQLite for quick local runs.
+"""Database layer for one service: PostgreSQL in the cloud, SQLite for a quick local run.
 
-Set DATABASE_URL (for example postgresql://user:pass@host:5432/dbname) to use
-PostgreSQL. If it is not set, a local SQLite file is used (DATABASE_PATH, default
-database.db next to this file). The rest of the app uses the same code for both.
+Each service owns its own database. Set DATABASE_URL (for example
+postgresql://user:pass@host:5432/dbname) to use PostgreSQL. If it is not set, a local
+SQLite file is used (DATABASE_PATH, default auth.db next to this file).
 """
 import os
 import sqlite3
@@ -10,7 +10,7 @@ import sqlite3
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 IS_PG = DATABASE_URL.startswith(("postgres://", "postgresql://"))
 SQLITE_PATH = os.environ.get(
-    "DATABASE_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "database.db")
+    "DATABASE_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "auth.db")
 )
 
 if IS_PG:
@@ -20,43 +20,6 @@ if IS_PG:
     IntegrityError = psycopg2.IntegrityError
 else:
     IntegrityError = sqlite3.IntegrityError
-
-_SCHEMA_SQLITE = """
-CREATE TABLE IF NOT EXISTS users(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    is_admin INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS predictions(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    symptoms TEXT NOT NULL,
-    results TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    FOREIGN KEY(user_id) REFERENCES users(id)
-);
-"""
-
-_SCHEMA_PG = """
-CREATE TABLE IF NOT EXISTS users(
-    id SERIAL PRIMARY KEY,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    is_admin INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS predictions(
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id),
-    symptoms TEXT NOT NULL,
-    results TEXT NOT NULL,
-    created_at TEXT NOT NULL
-);
-"""
 
 
 class Conn:
@@ -96,14 +59,14 @@ def connect():
     return Conn(raw)
 
 
-def init_schema(conn):
+def init_schema(conn, schema_sqlite, schema_pg, lock_id):
     """Create tables if missing. Safe to run from several workers at once."""
     if IS_PG:
         cur = conn.raw.cursor()
-        cur.execute("SELECT pg_advisory_xact_lock(727201)")  # one worker creates the tables
-        cur.execute(_SCHEMA_PG)
+        cur.execute("SELECT pg_advisory_xact_lock(%s)", (lock_id,))  # one worker creates the tables
+        cur.execute(schema_pg)
     else:
-        conn.raw.executescript(_SCHEMA_SQLITE)
+        conn.raw.executescript(schema_sqlite)
     conn.commit()
 
 

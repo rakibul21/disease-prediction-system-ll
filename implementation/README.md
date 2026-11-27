@@ -2,10 +2,10 @@
 
 A web app where a user registers, logs in, selects symptoms, and gets the most likely
 diseases (top 3 with a match score), precautions and the specialist to consult.
-Built with **Flask + a pure-Python Naive Bayes model** (no scikit-learn needed). Runs locally with SQLite or in the cloud with PostgreSQL and Docker.
+Built as **microservices** with Flask and a pure-Python Naive Bayes model (no scikit-learn needed).
 
 > Educational project. The model is trained on a small **synthetic dataset** generated from
-> symptom profiles in `data.py`. It is **not** a medical diagnosis tool.
+> symptom profiles in `prediction-service/data.py`. It is **not** a medical diagnosis tool.
 
 **Course:** Software Design, Dongshin University
 **Professor:** Musa Ibrahim
@@ -25,100 +25,119 @@ Built with **Flask + a pure-Python Naive Bayes model** (no scikit-learn needed).
 - Disease library page (19 diseases, 38 symptoms)
 - Admin dashboard: user list, total predictions, most predicted diseases, model accuracy
 
-## Run locally
+## Architecture: four services
+
+The browser talks only to the **gateway**. The gateway calls the other services over HTTP (REST, JSON).
+
+| Service | Port | Job | Own database |
+| --- | --- | --- | --- |
+| `gateway` | 5000 | Web pages, login session, calls the other services | none |
+| `auth-service` | 5001 | Register, login, user list | `users` table |
+| `prediction-service` | 5002 | Knowledge base and Naive Bayes model | none (stateless) |
+| `history-service` | 5003 | Saves and reads predictions, statistics | `predictions` table |
+
+```
+ Browser --> gateway --+--> auth-service        --> auth database
+                       +--> prediction-service      (no database)
+                       +--> history-service     --> history database
+```
+
+- **Database per service.** No service reads another service's tables. The history service stores only a user id number.
+- **Only the gateway is public.** The services accept calls only with the shared `X-Internal-Key` header.
+- **Failures stay small.** If the history service is down, the home page, disease library, prediction form and login still work, and the gateway shows a clear 503 message for the pages that need it.
+- **Health checks.** Every service has `/health`. The gateway also has `/ready`, which shows whether all services are up.
+
+### REST API of the services (called by the gateway)
+
+| Service | Endpoints |
+| --- | --- |
+| auth | `POST /register`, `POST /login`, `GET /users`, `GET /health` |
+| prediction | `GET /symptoms`, `GET /diseases`, `GET /diseases/<name>`, `POST /predict`, `GET /model`, `GET /health` |
+| history | `POST /predictions`, `GET /predictions?user_id=`, `GET /predictions/<id>`, `DELETE /predictions/<id>?user_id=`, `GET /stats`, `GET /health` |
+
+## Run locally (no Docker)
 
 Requires Python 3.9+.
 
 ```bash
-git clone <YOUR_GITHUB_REPO_URL>
-cd disease-prediction-system
-
 python -m venv venv
 # Windows:  venv\Scripts\activate
 # Mac/Linux: source venv/bin/activate
 
 pip install -r requirements.txt
-python app.py
+python run_local.py
 ```
 
-Open http://127.0.0.1:5000
-
-The database (`database.db`) is created automatically on first run; the model trains in memory in about a second.
+`run_local.py` starts the four services (each its own process) and prints their ports. Open http://127.0.0.1:5000 and press `Ctrl+C` to stop. Each service creates its own SQLite file (`auth-service/auth.db`, `history-service/history.db`).
 
 ### Demo admin account
 - Email: `admin@example.com`
 - Password: `admin123`
 
-(Normal users can register from the Register page.)
-
-## Cloud-native deployment
-
-The app follows the [twelve-factor](https://12factor.net) approach, so the same code runs on a laptop, in Docker, or on a cloud platform.
-
-| Cloud-native feature | How it is done here |
-| --- | --- |
-| Containerised | `Dockerfile` (Python 3.12 slim, non-root user, built-in `HEALTHCHECK`) |
-| Production web server | `gunicorn` with `gunicorn.conf.py` (workers set by `WEB_CONCURRENCY`) |
-| Stateless app, external database | PostgreSQL through `DATABASE_URL` (`db.py`). SQLite is used only if `DATABASE_URL` is empty |
-| Config from the environment | `SECRET_KEY`, `DATABASE_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `PORT`, `COOKIE_SECURE`, `LOG_LEVEL` (see `.env.example`). With `APP_ENV=production` the app refuses to start without a `SECRET_KEY` |
-| Health check | `GET /health` returns 200 `{"status":"ok"}` or 503 when the database is down |
-| Logs to stdout | Collected by Docker or the platform |
-| Behind a load balancer | `TRUST_PROXY=1` (set in the image) uses the proxy headers |
-| Horizontal scaling | Any number of identical containers can run. The model trains with a fixed seed, so all give the same answers |
-| CI/CD | `.github/workflows/ci.yml` runs the tests on SQLite and PostgreSQL, builds the image and smoke-tests it |
-| Infrastructure as code | `docker-compose.yml` (app + PostgreSQL) and `render.yaml` (Render.com blueprint) |
-
-### Run with Docker (app + PostgreSQL)
+## Run with Docker (four containers + PostgreSQL)
 
 ```bash
-cd implementation
 docker compose up --build
 ```
 
-Open http://localhost:5000 and check http://localhost:5000/health. Stop with `docker compose down` (add `-v` to delete the database volume).
+Open http://localhost:5000 and check http://localhost:5000/ready. Only the gateway is published; the services talk to each other on a private network. The auth and history services use separate databases (`auth_db`, `history_db`) on one PostgreSQL server. Stop with `docker compose down` (add `-v` to delete the data).
 
-### Run the tests on PostgreSQL
+Check the running system from the command line:
 
 ```bash
-pip install -r requirements-cloud.txt
-set DATABASE_URL=postgresql://user:pass@localhost:5432/dbname      # Windows
-export DATABASE_URL=postgresql://user:pass@localhost:5432/dbname   # Mac/Linux
+python scripts/smoke_test.py http://localhost:5000
+```
+
+## Cloud-native features
+
+| Feature | How it is done here |
+| --- | --- |
+| Containerised | One `Dockerfile` per service (Python 3.12 slim, non-root user, `HEALTHCHECK`) |
+| Production server | `gunicorn` with `gunicorn.conf.py` in every service |
+| External database | PostgreSQL through `DATABASE_URL` (SQLite only if it is not set) |
+| Config from the environment | `SECRET_KEY`, `INTERNAL_API_KEY`, `DATABASE_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `*_URL`, `PORT`, `LOG_LEVEL` (see `.env.example`) |
+| Stateless services | The gateway keeps the login in a signed cookie; the prediction service has no data |
+| Logs to stdout | Collected by Docker or the platform |
+| CI/CD | `.github/workflows/ci.yml` runs the tests on SQLite and PostgreSQL, then builds all images and smoke-tests the whole system |
+| Blueprint for Render.com | `render.yaml` in the repository root (not tested) |
+
+## Tests
+
+```bash
 python -m unittest discover -s tests -v
 ```
 
-### Deploy to the cloud (Render example)
+The 26 tests start the four real services as separate processes and use the system through HTTP. Test names match the test cases (TC-01 to TC-26) in the RTM. TC-25 checks that the services are independent (own databases, internal key) and TC-26 checks that the system keeps working when a service is stopped.
 
-1. Push the repository to GitHub.
-2. In Render choose **New + > Blueprint** and select the repository. It reads `render.yaml` and creates the web service and the PostgreSQL database.
-3. Render sets `SECRET_KEY`, `ADMIN_PASSWORD` and `DATABASE_URL` automatically. Read the admin password in the service's environment settings.
-4. Open the service URL and `/health`.
+Run them on PostgreSQL:
 
-The same Docker image also works on AWS (ECS/App Runner), Google Cloud Run, Azure Container Apps or Kubernetes. Only the environment variables change.
+```bash
+pip install psycopg2-binary
+set TEST_PG_URL=postgresql://user:pass@localhost:5432      # Windows
+export TEST_PG_URL=postgresql://user:pass@localhost:5432   # Mac/Linux
+python -m unittest discover -s tests -v
+```
 
 ## Project structure
+
 ```
-app.py                  Flask routes, login, configuration, /health
-db.py                   Database layer (PostgreSQL or SQLite)
-model.py                Dataset generation, training, prediction
-data.py                 Diseases, symptoms, precautions, specialists, team info
-templates/              HTML pages (Jinja2)
-static/style.css        Styling
-requirements.txt        Packages for a local run (Flask only)
-requirements-cloud.txt  Adds gunicorn and PostgreSQL driver
-Dockerfile              Container image
-docker-compose.yml      App + PostgreSQL
-gunicorn.conf.py        Web server settings
-.env.example            Example environment variables
+gateway/              Web pages (templates, static), session, clients.py (calls the services)
+auth-service/         Users and login (app.py, db.py)
+prediction-service/   data.py (knowledge base), model.py (Naive Bayes), app.py (API)
+history-service/      Saved predictions and statistics (app.py, db.py)
+postgres/             SQL that creates the second database
+scripts/smoke_test.py End-to-end check of a running system
+tests/                harness.py (starts the services) and test_integration.py
+run_local.py          Starts all services without Docker
+docker-compose.yml    All services + PostgreSQL
+.env.example          Example environment variables
+RACI-matrix.md        Team responsibilities
 ```
 
-## How the prediction works
-1. `data.py` stores each disease's core and secondary symptoms.
-2. `model.py` generates 400 synthetic patient records per disease (with random noise) and trains a Bernoulli Naive Bayes classifier.
-3. When the user submits symptoms, they are converted to a 0/1 vector and the model returns class probabilities; the top 3 are shown (capped at 95%).
+Each service folder is self-contained (own `requirements.txt`, `Dockerfile`, `gunicorn.conf.py`).
 
 ## Possible future improvements
-- Train on a real dataset (e.g. the Kaggle "Disease Symptom Prediction" dataset)
-- Severity weights per symptom, age and gender inputs
-- Bengali / Korean language support
-- Email password reset, CSRF protection
-- Kubernetes manifests, database migrations (Alembic), a separate model service
+- Train the model on a real dataset (for example from Kaggle)
+- Nearby medical facility map, more diseases (Dengue and Diabetes first)
+- Token-based login (JWT) between the services, CSRF protection, e-mail password reset
+- Message queue for events, Kubernetes manifests, database migrations (Alembic)

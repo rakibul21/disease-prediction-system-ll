@@ -1,25 +1,50 @@
-# Render.com blueprint: web service + managed PostgreSQL (free tiers may change).
+# Render.com blueprint (NOT tested): four web services and one PostgreSQL database.
+# docker-compose.yml is the tested way to run the whole system.
 services:
   - type: web
-    name: disease-prediction-system
+    name: dps-gateway
     runtime: docker
-    dockerContext: ./implementation
-    dockerfilePath: ./implementation/Dockerfile
+    dockerContext: ./implementation/gateway
+    dockerfilePath: ./implementation/gateway/Dockerfile
     healthCheckPath: /health
     envVars:
-      - key: APP_ENV
-        value: production
-      - key: COOKIE_SECURE
-        value: "1"
-      - key: SECRET_KEY
-        generateValue: true
-      - key: ADMIN_PASSWORD
-        generateValue: true
+      - {key: APP_ENV, value: production}
+      - {key: COOKIE_SECURE, value: "1"}
+      - {key: SECRET_KEY, generateValue: true}
+      - {key: INTERNAL_API_KEY, sync: false}
+      - {key: AUTH_URL, sync: false}        # e.g. https://dps-auth.onrender.com
+      - {key: PREDICTION_URL, sync: false}
+      - {key: HISTORY_URL, sync: false}
+  - type: web
+    name: dps-auth
+    runtime: docker
+    dockerContext: ./implementation/auth-service
+    dockerfilePath: ./implementation/auth-service/Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - {key: INTERNAL_API_KEY, sync: false}   # same value in every service
+      - {key: ADMIN_PASSWORD, generateValue: true}
       - key: DATABASE_URL
-        fromDatabase:
-          name: disease-db
-          property: connectionString
+        fromDatabase: {name: dps-db, property: connectionString}
+  - type: web
+    name: dps-prediction
+    runtime: docker
+    dockerContext: ./implementation/prediction-service
+    dockerfilePath: ./implementation/prediction-service/Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - {key: INTERNAL_API_KEY, sync: false}
+  - type: web
+    name: dps-history
+    runtime: docker
+    dockerContext: ./implementation/history-service
+    dockerfilePath: ./implementation/history-service/Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - {key: INTERNAL_API_KEY, sync: false}
+      - key: DATABASE_URL
+        fromDatabase: {name: dps-db, property: connectionString}
 
 databases:
-  - name: disease-db
+  - name: dps-db
     plan: free

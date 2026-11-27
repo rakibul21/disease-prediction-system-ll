@@ -1,30 +1,63 @@
-# Start the whole system (web app + PostgreSQL) with:  docker compose up --build
+# Start the whole system with:   docker compose up --build
+# Only the gateway is published to your computer; the services talk to each other on a private network.
+x-common: &common
+  restart: unless-stopped
+  environment: &common-env
+    APP_ENV: production
+    INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key-change-me}
+
 services:
-  web:
-    build: .
+  gateway:
+    build: ./gateway
+    <<: *common
     ports:
       - "5000:5000"
     environment:
-      APP_ENV: production
+      <<: *common-env
       SECRET_KEY: ${SECRET_KEY:-dev-only-change-me}
-      DATABASE_URL: postgresql://disease:disease@db:5432/disease
+      AUTH_URL: http://auth:5001
+      PREDICTION_URL: http://prediction:5002
+      HISTORY_URL: http://history:5003
+    depends_on:
+      auth: {condition: service_healthy}
+      prediction: {condition: service_healthy}
+      history: {condition: service_healthy}
+
+  auth:
+    build: ./auth-service
+    <<: *common
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://disease:disease@db:5432/auth_db
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
     depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
+      db: {condition: service_healthy}
+
+  prediction:
+    build: ./prediction-service
+    <<: *common
+
+  history:
+    build: ./history-service
+    <<: *common
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://disease:disease@db:5432/history_db
+    depends_on:
+      db: {condition: service_healthy}
 
   db:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: disease
       POSTGRES_PASSWORD: disease
-      POSTGRES_DB: disease
+      POSTGRES_DB: auth_db
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U disease -d disease"]
+      test: ["CMD-SHELL", "pg_isready -U disease -d auth_db"]
       interval: 5s
       timeout: 5s
       retries: 10
