@@ -64,10 +64,15 @@ class Tests(unittest.TestCase):
         con.close()
 
     # ---- cloud readiness ----
-    def test_health_endpoint(self):
-        r = client().get("/health")
+    def test_tc24_nfr_cloud_ready(self):
+        r = client().get("/health")  # health probe used by Docker and load balancers
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.get_json()["status"], "ok")
+        for f in ("Dockerfile", "docker-compose.yml", "requirements-cloud.txt",
+                  "gunicorn.conf.py", "db.py", ".env.example"):
+            self.assertTrue(os.path.exists(os.path.join(ROOT, f)), f)
+        with open(os.path.join(ROOT, "Dockerfile"), encoding="utf-8") as fh:
+            self.assertIn("gunicorn", fh.read())
 
     # ---- accounts ----
     def test_tc01_register_and_duplicate_email(self):
