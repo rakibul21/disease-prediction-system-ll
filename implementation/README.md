@@ -22,7 +22,7 @@ Built with **Flask + a pure-Python Naive Bayes model** (no scikit-learn needed).
 - ML prediction: top 3 diseases + match score, precautions, doctor type
 - Prediction history per user (view / delete), print or save result as PDF
 - About page and footer showing course, professor and team
-- Disease library page (18 diseases, 40+ symptoms)
+- Disease library page (19 diseases, 38 symptoms)
 - Admin dashboard: user list, total predictions, most predicted diseases, model accuracy
 
 ## Run locally
